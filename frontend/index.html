@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Governed Self-Service Analytics with Query Cost Control · Capstone</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- FontAwesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              900: '#0c4a6e',
+            },
+            surface: {
+              base: '#0b1120',
+              card: '#131d31',
+              cardHover: '#1a2742',
+              border: '#1e293b',
+              input: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0b1120;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .stepper-line {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #1e293b;
+      z-index: 0;
+      transform: translateY(-50%);
+    }
+    .code-editor {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col custom-scrollbar">
+
+  <!-- TOP CAPSTONE BANNER & HEADER -->
+  <header class="border-b border-surface-border bg-surface-card/90 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+      <!-- Capstone Meta Info Row -->
+      <div class="flex flex-wrap items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800/80 gap-2">
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 font-semibold border border-sky-500/20">
+            DATA ENGINEERING FOR AI · CAPSTONE
+          </span>
+          <span class="hidden md:inline text-slate-500">|</span>
+          <span class="font-medium text-slate-300">KL UNIVERSITY (DSCI-72)</span>
+          <span class="hidden lg:inline text-slate-500">· Dept. of Computer Science & Information Technology</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span>Guide: <strong class="text-slate-200">Dr. Ch Ramesh Kumar</strong></span>
+          <span class="text-slate-500">|</span>
+          <span class="text-slate-300 font-mono">Team: 2300090166 · 2300090172 · 2300090175 · 2300090180</span>
+        </div>
+      </div>
+
+      <!-- Main Header Row -->
+      <div class="pt-2.5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <span class="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white text-sm shadow-lg shadow-sky-500/20">
+              <i class="fa-solid fa-scale-balanced"></i>
+            </span>
+            Governed Self-Service Analytics
+            <span class="text-sky-400 font-normal text-sm sm:text-base">with Query Cost Control</span>
+          </h1>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Balancing <span class="text-sky-300 font-medium">User Freedom</span> + <span class="text-emerald-300 font-medium">Data Governance</span> + <span class="text-amber-300 font-medium">Query Cost Control</span>
+          </p>
+        </div>
+
+        <!-- System Health & Role Status Pill -->
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-slate-400">Warehouse:</span>
+            <span class="text-emerald-400 font-medium">Online (SQLite 3)</span>
+          </div>
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+            <i class="fa-solid fa-user-shield text-sky-400"></i>
+            <span class="text-slate-400">Active Role:</span>
+            <span id="headerRoleBadge" class="font-semibold text-sky-400 uppercase tracking-wider">analyst</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="flex items-center gap-1 sm:gap-2 mt-3 pt-1 border-t border-slate-800/60 overflow-x-auto text-xs sm:text-sm font-medium">
+        <button onclick="switchTab('studio')" id="tabBtn-studio" class="tab-btn px-3 py-2 rounded-lg text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-2 transition">
+          <i class="fa-solid fa-terminal"></i> Interactive Query Studio
+        </button>
+        <button onclick="switchTab('architecture')" id="tabBtn-architecture" class="tab-btn px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 flex items-center gap-2 transition">
+          <i class="fa-solid fa-sitemap"></i> System Architecture (Slide 07-08)
+        </button>
+        <button onclick="switchTab('slides')" id="tabBtn-slides" class="tab-btn px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 flex items-center gap-2 transition">
+          <i class="fa-solid fa-person-chalkboard"></i> Capstone Presentation (Slides 01-10)
+        </button>
+        <button onclick="switchTab('audit')" id="tabBtn-audit" class="tab-btn px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 flex items-center gap-2 transition">
+          <i class="fa-solid fa-clock-rotate-left"></i> Audit & Governance Logs
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+
+    <!-- ========================================== -->
+    <!-- TAB 1: INTERACTIVE QUERY STUDIO -->
+    <!-- ========================================== -->
+    <div id="tabContent-studio" class="space-y-6">
+
+      <!-- THE CORE 3-FORCE BALANCE BAR -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="p-3.5 rounded-xl bg-gradient-to-br from-sky-950/40 to-slate-900 border border-sky-800/30 flex items-start gap-3">
+          <div class="w-9 h-9 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 text-base">
+            <i class="fa-solid fa-bolt"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-sky-400">Force 1 · User Freedom</div>
+            <p class="text-xs text-slate-300 mt-0.5">Self-service exploration without waiting days for data engineers to build custom views.</p>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-gradient-to-br from-emerald-950/40 to-slate-900 border border-emerald-800/30 flex items-start gap-3">
+          <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-base">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-emerald-400">Force 2 · Data Governance</div>
+            <p class="text-xs text-slate-300 mt-0.5">RBAC & table policies prevent unauthorized access to sensitive financial/sales datasets.</p>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-800/30 flex items-start gap-3">
+          <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 text-base">
+            <i class="fa-solid fa-coins"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-amber-400">Force 3 · Query Cost Control</div>
+            <p class="text-xs text-slate-300 mt-0.5">Pre-execution EXPLAIN plan predicts scanned rows, enforcing soft/hard budget limits.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAIN STUDIO WORKBENCH GRID -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- LEFT CONTROL PANEL (Role, Scenarios, Budgets) -->
+        <div class="lg:col-span-4 space-y-5">
+
+          <!-- ROLE SWITCHER CARD -->
+          <div class="p-4 rounded-xl bg-surface-card border border-surface-border shadow-sm">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center justify-between">
+              <span>1. Select User Role</span>
+              <i class="fa-solid fa-id-badge text-sky-400"></i>
+            </h2>
+            <div class="grid grid-cols-3 gap-2" id="roleSelectorContainer">
+              <button onclick="selectRole('analyst')" id="roleBtn-analyst" class="p-2.5 rounded-lg border text-center transition flex flex-col items-center gap-1 bg-sky-500/15 border-sky-500 text-sky-300">
+                <i class="fa-solid fa-chart-line text-sm"></i>
+                <span class="text-xs font-semibold">analyst</span>
+              </button>
+              <button onclick="selectRole('admin')" id="roleBtn-admin" class="p-2.5 rounded-lg border text-center transition flex flex-col items-center gap-1 bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200">
+                <i class="fa-solid fa-user-gear text-sm"></i>
+                <span class="text-xs font-semibold">admin</span>
+              </button>
+              <button onclick="selectRole('student_viewer')" id="roleBtn-student_viewer" class="p-2.5 rounded-lg border text-center transition flex flex-col items-center gap-1 bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200">
+                <i class="fa-solid fa-graduation-cap text-sm"></i>
+                <span class="text-xs font-semibold">student_viewer</span>
+              </button>
+            </div>
+            <p id="roleDescription" class="text-xs text-slate-400 mt-2.5 bg-slate-900/60 p-2 rounded border border-slate-800">
+              Loading role permissions...
+            </p>
+          </div>
+
+          <!-- DEMO SCENARIOS ACCORDION (Matching PPT Slides 03 & 04) -->
+          <div class="p-4 rounded-xl bg-surface-card border border-surface-border shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">
+                <span>PPT Benchmark Scenarios</span>
+              </h2>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">1-Click Test</span>
+            </div>
+            <div class="space-y-2" id="demoScenariosList">
+              <div class="text-xs text-slate-500">Loading demo scenarios...</div>
+            </div>
+          </div>
+
+          <!-- CONFIGURED POLICY BUDGETS CARD -->
+          <div class="p-4 rounded-xl bg-surface-card border border-surface-border shadow-sm">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+              <span>Configured Cost Policies</span>
+              <i class="fa-solid fa-sliders text-amber-400"></i>
+            </h2>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between items-center py-1 border-b border-slate-800">
+                <span class="text-slate-400">Soft Budget Limit:</span>
+                <span class="font-semibold text-amber-400 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">$0.50 (WARN)</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-800">
+                <span class="text-slate-400">Hard Budget Limit:</span>
+                <span class="font-semibold text-rose-400 px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20">$1.00 (BLOCK)</span>
+              </div>
+              <div class="flex justify-between items-center py-1">
+                <span class="text-slate-400">Cost Heuristic:</span>
+                <span class="font-mono text-slate-300">$0.02 / 1,000 rows</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- WAREHOUSE SCHEMA REFERENCE (Collapsible) -->
+          <div class="p-4 rounded-xl bg-surface-card border border-surface-border shadow-sm">
+            <details class="text-xs cursor-pointer group">
+              <summary class="font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between list-none">
+                <span class="flex items-center gap-2">
+                  <i class="fa-solid fa-database text-sky-400"></i> Warehouse Schema
+                </span>
+                <i class="fa-solid fa-chevron-down text-slate-500 group-open:rotate-180 transition"></i>
+              </summary>
+              <div class="mt-3 pt-2 border-t border-slate-800 space-y-3" id="warehouseSchemaContent">
+                <div class="text-slate-500">Loading tables...</div>
+              </div>
+            </details>
+          </div>
+
+        </div>
+
+        <!-- RIGHT MAIN WORKBENCH PANEL -->
+        <div class="lg:col-span-8 space-y-5">
+
+          <!-- QUERY INPUT MODE SWITCHER & EDITOR -->
+          <div class="p-5 rounded-xl bg-surface-card border border-surface-border shadow-sm">
+            
+            <!-- Mode Switcher Header -->
+            <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">2. Query Mode:</span>
+                <div class="inline-flex rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs">
+                  <button onclick="setQueryMode('semantic')" id="modeBtn-semantic" class="px-3 py-1.5 rounded-md font-medium text-sky-400 bg-sky-500/20 shadow-sm transition">
+                    <i class="fa-solid fa-layer-group mr-1.5"></i> Semantic Layer (Approved)
+                  </button>
+                  <button onclick="setQueryMode('custom')" id="modeBtn-custom" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-code mr-1.5"></i> Custom SQL Studio
+                  </button>
+                </div>
+              </div>
+
+              <!-- Quick action helpers -->
+              <div id="customSqlHelperPills" class="hidden flex items-center gap-1.5 text-xs">
+                <button onclick="insertSqlSnippet('select_students')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                  Students Filter
+                </button>
+                <button onclick="insertSqlSnippet('cross_join')" class="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 transition">
+                  Cross Join (Costly)
+                </button>
+                <button onclick="insertSqlSnippet('sales_scan')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                  Sales Scan
+                </button>
+              </div>
+            </div>
+
+            <!-- MODE A: SEMANTIC LAYER DROPDOWN -->
+            <div id="semanticModeContainer" class="pt-4 space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Select Pre-Approved Business Metric:</label>
+                <select id="metricSelect" onchange="onMetricSelected()" class="w-full bg-surface-input border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-sky-500 transition">
+                  <option value="">Loading metrics...</option>
+                </select>
+              </div>
+
+              <!-- Approved Semantic Definition Card (Highlighting Slide 05) -->
+              <div id="metricFormulaCard" class="p-3.5 rounded-lg bg-sky-950/20 border border-sky-800/30 text-xs text-sky-200 flex items-start gap-3">
+                <i class="fa-solid fa-bookmark text-sky-400 mt-0.5"></i>
+                <div class="flex-1">
+                  <div class="font-semibold text-sky-300 flex items-center justify-between">
+                    <span id="formulaMetricTitle">Approved Metric Definition (Slide 05)</span>
+                    <span id="formulaCategoryBadge" class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 uppercase">students</span>
+                  </div>
+                  <div id="formulaText" class="mt-1 font-mono text-amber-300">Revenue = Sales Amount - Discounts - Returns</div>
+                  <div id="formulaDescription" class="mt-1 text-slate-400">All users calculate metrics consistently through this single governed layer.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MODE B: CUSTOM SQL STUDIO -->
+            <div id="customModeContainer" class="hidden pt-4 space-y-3">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-xs font-medium text-slate-300">Enter Ad-Hoc SQL Query (Read-Only SELECT):</label>
+                  <span class="text-[11px] text-slate-500">Active Query Planner Active</span>
+                </div>
+                <textarea id="customSqlInput" rows="5" class="code-editor w-full bg-surface-input border border-slate-700 rounded-lg p-3 text-xs sm:text-sm text-emerald-300 focus:outline-none focus:border-sky-500 transition shadow-inner custom-scrollbar" placeholder="SELECT department, COUNT(*), ROUND(AVG(marks), 2) AS avg_marks FROM students GROUP BY department;"></textarea>
+              </div>
+              <p class="text-[11px] text-slate-400">
+                <i class="fa-solid fa-circle-info text-sky-400 mr-1"></i>
+                Before executing, the query analyzer checks table authorization for your role and executes <code class="text-sky-300 font-mono">EXPLAIN QUERY PLAN</code> to predict Cartesian joins, full scans, and budget impact.
+              </p>
+            </div>
+
+            <!-- RUN QUERY BUTTON -->
+            <div class="mt-5 pt-3 border-t border-slate-800 flex items-center justify-between">
+              <div class="text-xs text-slate-400 flex items-center gap-2">
+                <span>User:</span>
+                <input id="usernameInput" type="text" value="analyst_user" class="bg-surface-input border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-sky-500 w-32" />
+              </div>
+
+              <button id="runQueryBtn" onclick="runGovernedQuery()" class="px-5 py-2.5 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 flex items-center gap-2 transition active:scale-95">
+                <i class="fa-solid fa-play text-xs"></i>
+                <span>Run Governed Query</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- LIVE VISUAL 5-STAGE PIPELINE STEPPER (Slides 04 & 07) -->
+          <div class="p-5 rounded-xl bg-surface-card border border-surface-border shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                <i class="fa-solid fa-arrows-split-up-and-left text-sky-400"></i>
+                <span>Active Governance & Cost Pipeline</span>
+              </h2>
+              <span id="pipelineOverallStatus" class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                Standby
+              </span>
+            </div>
+
+            <!-- Pipeline Steps Horizontal Stepper -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 relative">
+              
+              <!-- Stage 1: Request -->
+              <div id="step-1" class="pipeline-step p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-center transition">
+                <div class="w-7 h-7 mx-auto rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs font-bold mb-1.5 step-icon">
+                  1
+                </div>
+                <div class="text-[11px] font-semibold text-slate-300">Request</div>
+                <div class="text-[9px] text-slate-500 step-status">Parsed</div>
+              </div>
+
+              <!-- Stage 2: Semantic / AST -->
+              <div id="step-2" class="pipeline-step p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-center transition">
+                <div class="w-7 h-7 mx-auto rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs font-bold mb-1.5 step-icon">
+                  2
+                </div>
+                <div class="text-[11px] font-semibold text-slate-300">Semantic / AST</div>
+                <div class="text-[9px] text-slate-500 step-status">Resolved</div>
+              </div>
+
+              <!-- Stage 3: Governance Check -->
+              <div id="step-3" class="pipeline-step p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-center transition">
+                <div class="w-7 h-7 mx-auto rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs font-bold mb-1.5 step-icon">
+                  3
+                </div>
+                <div class="text-[11px] font-semibold text-slate-300">Governance</div>
+                <div class="text-[9px] text-slate-500 step-status">Role Check</div>
+              </div>
+
+              <!-- Stage 4: Cost Estimator -->
+              <div id="step-4" class="pipeline-step p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-center transition">
+                <div class="w-7 h-7 mx-auto rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs font-bold mb-1.5 step-icon">
+                  4
+                </div>
+                <div class="text-[11px] font-semibold text-slate-300">Cost Estimator</div>
+                <div class="text-[9px] text-slate-500 step-status">Plan Scanned</div>
+              </div>
+
+              <!-- Stage 5: Policy Decision -->
+              <div id="step-5" class="pipeline-step col-span-2 sm:col-span-1 p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-center transition">
+                <div class="w-7 h-7 mx-auto rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs font-bold mb-1.5 step-icon">
+                  5
+                </div>
+                <div class="text-[11px] font-semibold text-slate-300">Policy Engine</div>
+                <div class="text-[9px] text-slate-500 step-status">ALLOW/BLOCK</div>
+              </div>
+            </div>
+
+            <!-- Decision Result Banner & Budget Gauge -->
+            <div id="decisionCard" class="mt-4 p-4 rounded-xl border transition hidden">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                  <div id="decisionBadge" class="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest">
+                    ALLOW
+                  </div>
+                  <div>
+                    <h3 id="decisionTitle" class="text-sm font-bold text-white">Query Approved for Warehouse Execution</h3>
+                    <p id="decisionReason" class="text-xs text-slate-300 mt-0.5">Under budget and access granted.</p>
+                  </div>
+                </div>
+
+                <!-- Numerical Cost Stats Pill -->
+                <div class="flex items-center gap-3 text-xs bg-slate-900/80 px-3 py-2 rounded-lg border border-slate-800">
+                  <div>
+                    <span class="text-slate-500">Est. Cost:</span>
+                    <span id="decisionCostVal" class="font-bold text-emerald-400 ml-1">$0.0012</span>
+                  </div>
+                  <span class="text-slate-700">|</span>
+                  <div>
+                    <span class="text-slate-500">Rows Scanned:</span>
+                    <span id="decisionRowsVal" class="font-semibold text-slate-200 ml-1">60</span>
+                  </div>
+                  <span class="text-slate-700">|</span>
+                  <div>
+                    <span class="text-slate-500">Time:</span>
+                    <span id="decisionTimeVal" class="font-mono text-sky-400 ml-1">4.2 ms</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cost Budget Visual Bar Meter -->
+              <div class="mt-4 pt-3 border-t border-slate-800/80">
+                <div class="flex justify-between text-[10px] text-slate-400 mb-1">
+                  <span>$0.00 (Zero)</span>
+                  <span class="text-amber-400 font-medium">Soft Budget: $0.50</span>
+                  <span class="text-rose-400 font-medium">Hard Budget: $1.00</span>
+                  <span>$2.50+</span>
+                </div>
+                <div class="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800 relative">
+                  <!-- Soft threshold line at 20% (0.50 / 2.50) -->
+                  <div class="absolute top-0 bottom-0 left-[20%] w-0.5 bg-amber-400/80 z-10" title="Soft Budget: $0.50"></div>
+                  <!-- Hard threshold line at 40% (1.00 / 2.50) -->
+                  <div class="absolute top-0 bottom-0 left-[40%] w-0.5 bg-rose-500/90 z-10" title="Hard Budget: $1.00"></div>
+                  
+                  <div id="costProgressBar" class="h-full bg-emerald-500 transition-all duration-500" style="width: 2%;"></div>
+                </div>
+              </div>
+
+              <!-- Active SQL Query Plan breakdown (if available) -->
+              <div id="queryPlanBreakdown" class="mt-3 pt-2 text-[11px] text-slate-400 border-t border-slate-800/60 hidden">
+                <div class="font-semibold text-slate-300 mb-1">Query Planner & Complexity Analysis:</div>
+                <ul id="queryPlanList" class="list-disc list-inside space-y-0.5 text-slate-400 font-mono text-[10px]"></ul>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RESULTS & VISUALIZATION PANEL -->
+          <div id="resultsCard" class="p-5 rounded-xl bg-surface-card border border-surface-border shadow-sm hidden">
+            
+            <!-- Result Bar Header -->
+            <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-3">
+              <div class="flex items-center gap-2">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Query Results:</h3>
+                <span id="resultsCountBadge" class="text-xs px-2 py-0.5 rounded bg-slate-800 text-sky-400 font-mono">0 rows</span>
+              </div>
+
+              <!-- Toggle Table / Chart -->
+              <div class="flex items-center gap-2">
+                <div class="inline-flex rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs">
+                  <button onclick="setViewMode('table')" id="viewBtn-table" class="px-2.5 py-1 rounded font-medium text-sky-400 bg-sky-500/20 transition">
+                    <i class="fa-solid fa-table mr-1"></i> Table View
+                  </button>
+                  <button onclick="setViewMode('chart')" id="viewBtn-chart" class="px-2.5 py-1 rounded font-medium text-slate-400 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-chart-column mr-1"></i> Chart View
+                  </button>
+                </div>
+                <button onclick="exportResultsCSV()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-download"></i> Export CSV
+                </button>
+              </div>
+            </div>
+
+            <!-- Table View Container -->
+            <div id="tableViewContainer" class="pt-3 overflow-x-auto custom-scrollbar max-h-80">
+              <table class="w-full text-xs text-left border-collapse" id="resultsTable">
+                <thead class="text-slate-400 uppercase bg-slate-900/80 sticky top-0 border-b border-slate-800" id="resultsTableHead"></thead>
+                <tbody class="divide-y divide-slate-800 text-slate-200" id="resultsTableBody"></tbody>
+              </table>
+            </div>
+
+            <!-- Chart View Container -->
+            <div id="chartViewContainer" class="pt-4 hidden">
+              <div class="h-64 w-full">
+                <canvas id="resultsChartCanvas"></canvas>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: SYSTEM ARCHITECTURE (Slides 07 & 08) -->
+    <!-- ========================================== -->
+    <div id="tabContent-architecture" class="space-y-6 hidden">
+      
+      <!-- Slide 08 End-to-End Architecture Flow -->
+      <div class="p-6 rounded-xl bg-surface-card border border-surface-border">
+        <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-network-wired text-sky-400"></i>
+              End-to-End Technical Architecture (Slide 08)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">How user queries flow through the governed layers before touching the analytical data warehouse.</p>
+          </div>
+          <span class="text-xs font-semibold px-2.5 py-1 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+            TECHNICAL DESIGN
+          </span>
+        </div>
+
+        <!-- Interactive Architecture Diagram -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+          <div class="p-4 rounded-xl bg-slate-900 border border-sky-500/40 relative">
+            <div class="text-xs font-bold text-sky-400 uppercase tracking-wider mb-1">Layer 1: Users & UI</div>
+            <div class="text-sm font-semibold text-white">Self-Service Client</div>
+            <p class="text-xs text-slate-400 mt-1">Analysts, Admins, and Viewers submit either semantic metrics or custom SQL.</p>
+            <div class="mt-3 text-[11px] font-mono text-slate-500">FastAPI/HTTP · Pure HTML/JS</div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-indigo-500/40 relative">
+            <div class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Layer 2: Governance & Semantic</div>
+            <div class="text-sm font-semibold text-white">Semantic Layer & RBAC</div>
+            <p class="text-xs text-slate-400 mt-1">Enforces pre-approved metric definitions & validates user role permissions against tables.</p>
+            <div class="mt-3 text-[11px] font-mono text-slate-500">access_control.py · semantic_layer.py</div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-amber-500/40 relative">
+            <div class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Layer 3: Cost Prediction & Policy</div>
+            <div class="text-sm font-semibold text-white">Active Cost Estimator</div>
+            <p class="text-xs text-slate-400 mt-1">Runs SQLite EXPLAIN QUERY PLAN, estimates scanned rows & enforces budget thresholds.</p>
+            <div class="mt-3 text-[11px] font-mono text-slate-500">cost_estimator.py · policy_engine.py</div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-emerald-500/40 relative">
+            <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Layer 4: Analytical Storage</div>
+            <div class="text-sm font-semibold text-white">Warehouse Execution</div>
+            <p class="text-xs text-slate-400 mt-1">Executes query ONLY if policy decides ALLOW/WARN. Blocks expensive runs completely.</p>
+            <div class="mt-3 text-[11px] font-mono text-slate-500">SQLite / PostgreSQL / Cloud DW</div>
+          </div>
+        </div>
+
+        <!-- Tech Stack Comparison Table (Prototype vs Production) -->
+        <div class="mt-8 pt-4 border-t border-slate-800">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3">Prototype vs Production Cloud Stack</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left border border-slate-800 rounded-lg">
+              <thead class="bg-slate-900 text-slate-400 uppercase border-b border-slate-800">
+                <tr>
+                  <th class="p-2.5">Component</th>
+                  <th class="p-2.5">Capstone Prototype</th>
+                  <th class="p-2.5">Enterprise Cloud Production</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800 text-slate-300">
+                <tr>
+                  <td class="p-2.5 font-medium text-sky-400">Frontend UI</td>
+                  <td class="p-2.5">Single-File Modern Dashboard (Tailwind + Chart.js)</td>
+                  <td class="p-2.5">React.js / Next.js Micro-frontend</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-medium text-sky-400">Backend API</td>
+                  <td class="p-2.5">Python HTTP Server (Zero External Dependencies)</td>
+                  <td class="p-2.5">FastAPI / Python Async Microservice</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-medium text-sky-400">Analytical Warehouse</td>
+                  <td class="p-2.5">SQLite Data Warehouse (Seeded with 700+ rows)</td>
+                  <td class="p-2.5">Google BigQuery / Snowflake / PostgreSQL</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-medium text-sky-400">Cost Engine</td>
+                  <td class="p-2.5">Active EXPLAIN QUERY PLAN + Row Statistics</td>
+                  <td class="p-2.5">Cloud Warehouse Dry-Run API ($6.25/TB model)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 07: 9 Data Engineering Responsibilities Grid -->
+      <div class="p-6 rounded-xl bg-surface-card border border-surface-border">
+        <h2 class="text-base font-bold text-white mb-1 flex items-center gap-2">
+          <i class="fa-solid fa-list-check text-sky-400"></i>
+          The 9 Data Engineering Responsibilities (Slide 07)
+        </h2>
+        <p class="text-xs text-slate-400 mb-4">Every stage from raw ingestion to dashboard reporting is managed by data engineering:</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="font-bold text-sky-400">1. Data Ingestion:</span>
+            <p class="text-slate-400 mt-1">Collecting operational students and sales transactions into warehouse landing zones.</p>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="font-bold text-sky-400">2. Data Modeling:</span>
+            <p class="text-slate-400 mt-1">Designing analytical star-schemas, dimensions, and normalized fact tables.</p>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="font-bold text-sky-400">3. Data Transformation:</span>
+            <p class="text-slate-400 mt-1">Cleaning, deduping, and calculating gross amounts, discounts, and return flags.</p>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="font-bold text-sky-400">4. Data Quality:</span>
+            <p class="text-slate-400 mt-1">Ensuring valid ranges for student marks, semester limits, and sales figures.</p>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="font-bold text-sky-400">5. Analytical Storage:</span>
+            <p class="text-slate-400 mt-1">Structuring columnar tables and indexes for high-throughput aggregation queries.</p>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="font-bold text-sky-400">6. Semantic Modeling:</span>
+            <p class="text-slate-400 mt-1">One approved metric definition for Revenue and Academic performance (Slide 05).</p>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="font-bold text-sky-400">7. Query Optimization:</span>
+            <p class="text-slate-400 mt-1">Using EXPLAIN QUERY PLAN to detect quadratic Cartesian cross-joins and unindexed scans.</p>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="font-bold text-sky-400">8. Governance:</span>
+            <p class="text-slate-400 mt-1">Role-based access control preventing unauthorized users from querying sales facts.</p>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="font-bold text-sky-400">9. Monitoring:</span>
+            <p class="text-slate-400 mt-1">Audit logging all query attempts, estimated costs, and ALLOW/BLOCK policy decisions.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: CAPSTONE PRESENTATION (Slides 01-10) -->
+    <!-- ========================================== -->
+    <div id="tabContent-slides" class="space-y-5 hidden">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-person-chalkboard text-sky-400"></i>
+            Capstone Presentation Walkthrough
+          </h2>
+          <p class="text-xs text-slate-400">Overview of the 10 slides from the official project presentation deck.</p>
+        </div>
+        <span class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 font-mono">10 Slides Deck</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <!-- Slide 01 & 02 -->
+        <div class="p-4 rounded-xl bg-surface-card border border-surface-border space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-sky-400">
+            <span>SLIDE 02: THE PROBLEM STATEMENT</span>
+            <span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-300">Problem</span>
+          </div>
+          <h3 class="text-sm font-semibold text-white">Excessive Governance vs Uncontrolled Query Costs</h3>
+          <div class="text-xs text-slate-300 space-y-1.5">
+            <p><strong class="text-rose-400">Problem 1: Excessive Governance:</strong> Too much restriction forces legitimate business users to depend on data engineers for every simple question.</p>
+            <p><strong class="text-amber-400">Problem 2: Uncontrolled Costs:</strong> Too much freedom lets unoptimized queries scan terabytes of warehouse data, causing cloud bill shock.</p>
+          </div>
+        </div>
+
+        <!-- Slide 03 -->
+        <div class="p-4 rounded-xl bg-surface-card border border-surface-border space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-emerald-400">
+            <span>SLIDE 03: REAL-WORLD EXAMPLE</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300">Walkthrough</span>
+          </div>
+          <h3 class="text-sm font-semibold text-white">University Administrator Scenario</h3>
+          <div class="text-xs text-slate-300 space-y-1">
+            <p>User Question: <span class="text-sky-300 italic">"Show average CSE student marks by semester."</span></p>
+            <p>1. <strong class="text-emerald-400">ALLOW:</strong> Cost is $0.20 &le; $1.00 budget &rarr; runs immediately.</p>
+            <p>2. <strong class="text-amber-400">WARN / BLOCK:</strong> Cost is $15 &gt; $1.00 budget &rarr; flagged/blocked by policy.</p>
+            <p>3. <strong class="text-rose-400">BLOCK:</strong> Sensitive data (sales) for viewer &rarr; blocked regardless of cost.</p>
+          </div>
+        </div>
+
+        <!-- Slide 04 & 05 -->
+        <div class="p-4 rounded-xl bg-surface-card border border-surface-border space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-indigo-400">
+            <span>SLIDE 05: REUSABLE SEMANTIC LAYER</span>
+            <span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300">Core Metric</span>
+          </div>
+          <h3 class="text-sm font-semibold text-white">Single Approved Business Metric Definitions</h3>
+          <p class="text-xs text-slate-300">Prevents different departments from calculating numbers differently:</p>
+          <div class="p-2.5 rounded bg-slate-900 border border-slate-800 text-xs font-mono text-amber-300">
+            Revenue = Sales Amount − Discounts − Returns
+          </div>
+          <p class="text-[11px] text-slate-400">Benefits: Consistent metrics, reduced ambiguity, reusable definitions, reliable analytics.</p>
+        </div>
+
+        <!-- Slide 06 -->
+        <div class="p-4 rounded-xl bg-surface-card border border-surface-border space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-amber-400">
+            <span>SLIDE 06: COST ESTIMATION & CONTROL</span>
+            <span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300">Differentiator</span>
+          </div>
+          <h3 class="text-sm font-semibold text-white">Pre-Execution Resource & Budget Capping</h3>
+          <p class="text-xs text-slate-300">The platform inspects query plans and estimates resource usage BEFORE executing:</p>
+          <ul class="text-xs text-slate-400 list-disc list-inside space-y-1">
+            <li>Query Plan & Cost Analysis &rarr; Estimated Compute ($)</li>
+            <li>Configurable Soft Budget ($0.50) & Hard Budget ($1.00)</li>
+            <li>Policy Engine Decides: <strong class="text-emerald-400">ALLOW</strong> / <strong class="text-amber-400">WARN</strong> / <strong class="text-rose-400">BLOCK</strong></li>
+          </ul>
+        </div>
+
+        <!-- Slide 09 -->
+        <div class="p-4 rounded-xl bg-surface-card border border-surface-border space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-sky-400">
+            <span>SLIDE 09: EVALUATION & EXPECTED OUTCOMES</span>
+            <span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-300">Outcomes</span>
+          </div>
+          <h3 class="text-sm font-semibold text-white">Controlled Self-Service Analytics</h3>
+          <ul class="text-xs text-slate-300 list-disc list-inside space-y-1">
+            <li>Reduces unnecessary expensive queries before they consume cloud resources.</li>
+            <li>Ensures semantic metric consistency across users.</li>
+            <li>Enforces governance without blocking legitimate self-service inquiries.</li>
+            <li>Full audit logging and visibility into warehouse usage.</li>
+          </ul>
+        </div>
+
+        <!-- Slide 10 -->
+        <div class="p-4 rounded-xl bg-surface-card border border-surface-border space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-emerald-400">
+            <span>SLIDE 10: CONCLUSION & FUTURE SCOPE</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300">Future Scope</span>
+          </div>
+          <h3 class="text-sm font-semibold text-white">Next-Generation Roadmap</h3>
+          <ul class="text-xs text-slate-300 list-disc list-inside space-y-1">
+            <li>Cloud Data Warehouse integrations (BigQuery, Snowflake).</li>
+            <li>AI-assisted natural language to SQL semantic translation.</li>
+            <li>Automated query rewrite and index recommendations.</li>
+            <li>Advanced lineage visualization and automated budget optimization.</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 4: AUDIT & GOVERNANCE LOGS -->
+    <!-- ========================================== -->
+    <div id="tabContent-audit" class="space-y-4 hidden">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-sky-400"></i>
+            Warehouse Query Audit Trail
+          </h2>
+          <p class="text-xs text-slate-400">Immutable governance log tracking every query, cost prediction, and enforcement decision.</p>
+        </div>
+        <button onclick="loadAuditLogs()" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-arrows-rotate"></i> Refresh Logs
+        </button>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-surface-border bg-surface-card shadow-sm">
+        <table class="w-full text-xs text-left">
+          <thead class="bg-slate-900 text-slate-400 uppercase border-b border-slate-800">
+            <tr>
+              <th class="p-3">ID</th>
+              <th class="p-3">Timestamp</th>
+              <th class="p-3">User</th>
+              <th class="p-3">Role</th>
+              <th class="p-3">Query / Metric</th>
+              <th class="p-3">Estimated Cost</th>
+              <th class="p-3">Decision</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800 text-slate-200" id="auditLogsBody">
+            <tr>
+              <td colspan="7" class="p-4 text-center text-slate-500">Loading audit trail...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-surface-border bg-surface-card/60 py-4 text-center text-xs text-slate-500 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-2">
+      <div>KL University · Department of Computer Science & Information Technology</div>
+      <div>Capstone Project · Supervised by Dr. Ch Ramesh Kumar</div>
+      <div>Prototype powered by Pure Python & SQLite3</div>
+    </div>
+  </footer>
+
+  <!-- CLIENT-SIDE APPLICATION JAVASCRIPT -->
+  <script>
+    // Global Application State
+    const state = {
+      role: 'analyst',
+      mode: 'semantic', // 'semantic' | 'custom'
+      rolesData: {},
+      metrics: [],
+      scenarios: [],
+      tables: {},
+      selectedMetric: null,
+      lastQueryResult: null,
+      viewMode: 'table',
+      chartInstance: null
+    };
+
+    // Initialize application on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadInitialData();
+    });
+
+    async function loadInitialData() {
+      try {
+        // 1. Load roles & budgets
+        const rolesRes = await fetch('/api/roles');
+        const rolesJson = await rolesRes.json();
+        state.rolesData = rolesJson.roles || {};
+        updateRoleDescription();
+
+        // 2. Load tables schema
+        const tablesRes = await fetch('/api/tables');
+        state.tables = await tablesRes.json();
+        renderWarehouseSchema();
+
+        // 3. Load demo scenarios
+        const scenariosRes = await fetch('/api/demo-scenarios');
+        const scenariosJson = await scenariosRes.json();
+        state.scenarios = scenariosJson.scenarios || [];
+        renderDemoScenarios();
+
+        // 4. Load metrics for default role
+        await loadMetricsForRole(state.role);
+
+        // 5. Load audit logs
+        loadAuditLogs();
+      } catch (err) {
+        console.error('Initialization error:', err);
+      }
+    }
+
+    // Role Selection
+    function selectRole(newRole) {
+      state.role = newRole;
+      document.getElementById('headerRoleBadge').textContent = newRole;
+
+      ['analyst', 'admin', 'student_viewer'].forEach(r => {
+        const btn = document.getElementById(`roleBtn-${r}`);
+        if (btn) {
+          if (r === newRole) {
+            btn.className = 'p-2.5 rounded-lg border text-center transition flex flex-col items-center gap-1 bg-sky-500/15 border-sky-500 text-sky-300';
+          } else {
+            btn.className = 'p-2.5 rounded-lg border text-center transition flex flex-col items-center gap-1 bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200';
+          }
+        }
+      });
+
+      updateRoleDescription();
+      loadMetricsForRole(newRole);
+    }
+
+    function updateRoleDescription() {
+      const roleInfo = state.rolesData[state.role];
+      if (roleInfo) {
+        document.getElementById('roleDescription').innerHTML = 
+          `<strong class="text-sky-300">${roleInfo.title}:</strong> ${roleInfo.description}<br>` +
+          `<span class="text-[11px] text-slate-500">Allowed Tables: ${roleInfo.allowed_tables.join(', ')}</span>`;
+      }
+    }
+
+    // Metrics Loader
+    async function loadMetricsForRole(role) {
+      try {
+        const res = await fetch(`/api/metrics?role=${role}`);
+        const data = await res.json();
+        state.metrics = data.metrics || [];
+
+        const select = document.getElementById('metricSelect');
+        select.innerHTML = '';
+
+        if (state.metrics.length === 0) {
+          select.innerHTML = '<option value="">No permitted metrics for this role</option>';
+          return;
+        }
+
+        state.metrics.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.name;
+          opt.textContent = `${m.title} (${m.estimated_rows} rows)`;
+          select.appendChild(opt);
+        });
+
+        // Auto select first
+        state.selectedMetric = state.metrics[0];
+        updateFormulaCard();
+      } catch (e) {
+        console.error('Failed to load metrics:', e);
+      }
+    }
+
+    function onMetricSelected() {
+      const val = document.getElementById('metricSelect').value;
+      state.selectedMetric = state.metrics.find(m => m.name === val) || null;
+      updateFormulaCard();
+    }
+
+    function updateFormulaCard() {
+      if (!state.selectedMetric) return;
+      document.getElementById('formulaMetricTitle').textContent = state.selectedMetric.title;
+      document.getElementById('formulaCategoryBadge').textContent = state.selectedMetric.category;
+      document.getElementById('formulaText').textContent = state.selectedMetric.formula || state.selectedMetric.description;
+      document.getElementById('formulaDescription').textContent = state.selectedMetric.description;
+    }
+
+    // Query Mode Switcher (Semantic vs Custom SQL)
+    function setQueryMode(mode) {
+      state.mode = mode;
+      const semBtn = document.getElementById('modeBtn-semantic');
+      const custBtn = document.getElementById('modeBtn-custom');
+      const semContainer = document.getElementById('semanticModeContainer');
+      const custContainer = document.getElementById('customModeContainer');
+      const helpers = document.getElementById('customSqlHelperPills');
+
+      if (mode === 'semantic') {
+        semBtn.className = 'px-3 py-1.5 rounded-md font-medium text-sky-400 bg-sky-500/20 shadow-sm transition';
+        custBtn.className = 'px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition';
+        semContainer.classList.remove('hidden');
+        custContainer.classList.add('hidden');
+        helpers.classList.add('hidden');
+      } else {
+        custBtn.className = 'px-3 py-1.5 rounded-md font-medium text-sky-400 bg-sky-500/20 shadow-sm transition';
+        semBtn.className = 'px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition';
+        custContainer.classList.remove('hidden');
+        semContainer.classList.add('hidden');
+        helpers.classList.remove('hidden');
+
+        // Set sample SQL if empty
+        const textarea = document.getElementById('customSqlInput');
+        if (!textarea.value.trim()) {
+          textarea.value = "SELECT department, COUNT(*) AS students, ROUND(AVG(marks), 2) AS avg_marks\nFROM students\nGROUP BY department\nORDER BY avg_marks DESC;";
+        }
+      }
+    }
+
+    // Quick SQL snippet helper
+    function insertSqlSnippet(type) {
+      const textarea = document.getElementById('customSqlInput');
+      if (type === 'select_students') {
+        textarea.value = "SELECT name, department, semester, marks\nFROM students\nWHERE marks >= 75\nORDER BY marks DESC\nLIMIT 25;";
+      } else if (type === 'cross_join') {
+        textarea.value = "SELECT st.name, st.department, s.product, s.amount\nFROM students st\nCROSS JOIN sales s;";
+      } else if (type === 'sales_scan') {
+        textarea.value = "SELECT region, product, SUM(amount - discount) AS net_revenue\nFROM sales\nWHERE return_flag = 0\nGROUP BY region, product;";
+      }
+    }
+
+    // Render Demo Scenarios (Slide 03 & 04)
+    function renderDemoScenarios() {
+      const container = document.getElementById('demoScenariosList');
+      container.innerHTML = '';
+
+      state.scenarios.forEach(sc => {
+        const item = document.createElement('div');
+        const badgeColor = sc.expected === 'ALLOW' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-rose-400 border-rose-500/30 bg-rose-500/10';
+        
+        item.className = 'p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-slate-700 cursor-pointer transition text-xs';
+        item.onclick = () => loadScenario(sc);
+
+        item.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200">${sc.title}</span>
+            <span class="text-[10px] font-extrabold px-1.5 py-0.2 rounded border ${badgeColor}">${sc.expected}</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-0.5 line-clamp-1">${sc.explanation}</p>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    async function loadScenario(sc) {
+      selectRole(sc.role);
+
+      if (sc.mode === 'custom') {
+        setQueryMode('custom');
+        document.getElementById('customSqlInput').value = sc.sql;
+      } else {
+        setQueryMode('semantic');
+        await loadMetricsForRole(sc.role);
+        const sel = document.getElementById('metricSelect');
+        sel.value = sc.metric;
+        onMetricSelected();
+      }
+
+      // Auto run for instant demo
+      runGovernedQuery();
+    }
+
+    // Warehouse Schema Renderer
+    function renderWarehouseSchema() {
+      const container = document.getElementById('warehouseSchemaContent');
+      container.innerHTML = '';
+
+      for (const [tbl, info] of Object.entries(state.tables)) {
+        const block = document.createElement('div');
+        block.className = 'p-2 rounded bg-slate-900 border border-slate-800';
+        const cols = info.columns.map(c => `<span class="text-slate-300 font-mono">${c.name}</span> <span class="text-slate-600">(${c.type})</span>`).join(', ');
+        block.innerHTML = `
+          <div class="flex items-center justify-between font-bold text-sky-400 mb-1">
+            <span>${tbl}</span>
+            <span class="text-slate-500 font-normal font-mono">${info.row_count} rows</span>
+          </div>
+          <div class="text-[10px] text-slate-400 leading-relaxed">${cols}</div>
+        `;
+        container.appendChild(block);
+      }
+    }
+
+    // Run Governed Query
+    async function runGovernedQuery() {
+      const runBtn = document.getElementById('runQueryBtn');
+      runBtn.disabled = true;
+      runBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Evaluating Pipeline...</span>';
+
+      resetPipelineVisuals();
+
+      const username = document.getElementById('usernameInput').value || 'demo_user';
+      const payload = {
+        username: username,
+        role: state.role,
+        mode: state.mode
+      };
+
+      if (state.mode === 'custom') {
+        payload.sql = document.getElementById('customSqlInput').value;
+      } else {
+        payload.metric = document.getElementById('metricSelect').value;
+      }
+
+      // Animate stages sequentially for presentation impact
+      animateStep(1, 'active', 'Evaluating input query...');
+      await sleep(150);
+
+      try {
+        const res = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        state.lastQueryResult = data;
+
+        // Process Pipeline Step 2 (Semantic / AST)
+        animateStep(1, 'pass', 'Parsed OK');
+        animateStep(2, 'pass', state.mode === 'semantic' ? 'Resolved Definition' : 'AST Validated');
+        await sleep(150);
+
+        // Process Pipeline Step 3 (Governance)
+        const access = data.access || {};
+        if (access.allowed) {
+          animateStep(3, 'pass', 'Role Permitted');
+        } else {
+          animateStep(3, 'fail', 'Access Denied');
+        }
+        await sleep(150);
+
+        // Process Pipeline Step 4 (Cost Estimator)
+        const cost = data.cost || {};
+        if (cost.risk_level === 'high') {
+          animateStep(4, 'fail', `$${cost.estimated_cost} (High Risk)`);
+        } else if (cost.risk_level === 'medium') {
+          animateStep(4, 'warn', `$${cost.estimated_cost} (Soft Warn)`);
+        } else {
+          animateStep(4, 'pass', `$${cost.estimated_cost} (Low Cost)`);
+        }
+        await sleep(150);
+
+        // Process Pipeline Step 5 (Policy Decision)
+        const policy = data.policy || {};
+        if (policy.decision === 'ALLOW') {
+          animateStep(5, 'pass', 'ALLOW');
+        } else if (policy.decision === 'WARN') {
+          animateStep(5, 'warn', 'WARN');
+        } else {
+          animateStep(5, 'fail', 'BLOCK');
+        }
+
+        // Render Decision Banner & Cost Gauge
+        renderDecisionCard(data);
+
+        // Render Results Table / Chart if executed
+        if (policy.can_execute && data.results) {
+          renderResults(data);
+        } else {
+          document.getElementById('resultsCard').classList.add('hidden');
+        }
+
+        // Refresh Audit logs
+        loadAuditLogs();
+
+      } catch (err) {
+        console.error('Query execution failed:', err);
+        animateStep(5, 'fail', 'Error');
+      } finally {
+        runBtn.disabled = false;
+        runBtn.innerHTML = '<i class="fa-solid fa-play text-xs"></i><span>Run Governed Query</span>';
+      }
+    }
+
+    // Step Animation Helpers
+    function resetPipelineVisuals() {
+      for (let i = 1; i <= 5; i++) {
+        const el = document.getElementById(`step-${i}`);
+        el.className = 'pipeline-step p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-center transition';
+        el.querySelector('.step-icon').className = 'w-7 h-7 mx-auto rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs font-bold mb-1.5 step-icon';
+        el.querySelector('.step-icon').textContent = i;
+        el.querySelector('.step-status').textContent = 'Pending';
+      }
+      document.getElementById('pipelineOverallStatus').className = 'text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+      document.getElementById('pipelineOverallStatus').textContent = 'Evaluating...';
+      document.getElementById('decisionCard').classList.add('hidden');
+    }
+
+    function animateStep(stepNum, status, text) {
+      const el = document.getElementById(`step-${stepNum}`);
+      const icon = el.querySelector('.step-icon');
+      const statusEl = el.querySelector('.step-status');
+
+      statusEl.textContent = text;
+
+      if (status === 'active') {
+        el.className = 'pipeline-step p-2.5 rounded-lg bg-sky-950/40 border border-sky-500/50 text-center transition animate-pulse';
+        icon.className = 'w-7 h-7 mx-auto rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-bold mb-1.5 step-icon';
+      } else if (status === 'pass') {
+        el.className = 'pipeline-step p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/50 text-center transition';
+        icon.className = 'w-7 h-7 mx-auto rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold mb-1.5 step-icon';
+        icon.innerHTML = '<i class="fa-solid fa-check"></i>';
+      } else if (status === 'warn') {
+        el.className = 'pipeline-step p-2.5 rounded-lg bg-amber-950/30 border border-amber-500/50 text-center transition';
+        icon.className = 'w-7 h-7 mx-auto rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold mb-1.5 step-icon';
+        icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+      } else if (status === 'fail') {
+        el.className = 'pipeline-step p-2.5 rounded-lg bg-rose-950/30 border border-rose-500/50 text-center transition';
+        icon.className = 'w-7 h-7 mx-auto rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-xs font-bold mb-1.5 step-icon';
+        icon.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      }
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Render Decision Banner & Budget Gauge
+    function renderDecisionCard(data) {
+      const card = document.getElementById('decisionCard');
+      const badge = document.getElementById('decisionBadge');
+      const title = document.getElementById('decisionTitle');
+      const reason = document.getElementById('decisionReason');
+      const overall = document.getElementById('pipelineOverallStatus');
+      const bar = document.getElementById('costProgressBar');
+
+      const policy = data.policy || {};
+      const cost = data.cost || {};
+      const access = data.access || {};
+
+      card.classList.remove('hidden');
+
+      // Populate numerical stats
+      document.getElementById('decisionCostVal').textContent = `$${(cost.estimated_cost || 0).toFixed(4)}`;
+      document.getElementById('decisionRowsVal').textContent = `${(cost.estimated_rows || 0).toLocaleString()} rows`;
+      document.getElementById('decisionTimeVal').textContent = `${data.execution_time_ms || 0} ms`;
+
+      // Update Gauge bar (scale: $2.50 = 100%)
+      const costVal = cost.estimated_cost || 0;
+      const pct = Math.min(Math.max((costVal / 2.50) * 100, 3), 100);
+      bar.style.width = `${pct}%`;
+
+      if (policy.decision === 'ALLOW') {
+        card.className = 'mt-4 p-4 rounded-xl border border-emerald-500/40 bg-emerald-950/20 transition';
+        badge.className = 'px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        badge.textContent = 'ALLOW';
+        title.textContent = 'Query Approved for Warehouse Execution';
+        reason.textContent = policy.reason;
+        overall.className = 'text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        overall.textContent = 'EXECUTION APPROVED';
+        bar.className = 'h-full bg-emerald-500 transition-all duration-500';
+      } else if (policy.decision === 'WARN') {
+        card.className = 'mt-4 p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 transition';
+        badge.className = 'px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        badge.textContent = 'WARN';
+        title.textContent = 'Query Allowed with Soft Budget Warning';
+        reason.textContent = policy.reason;
+        overall.className = 'text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        overall.textContent = 'SOFT BUDGET WARN';
+        bar.className = 'h-full bg-amber-500 transition-all duration-500';
+      } else {
+        card.className = 'mt-4 p-4 rounded-xl border border-rose-500/40 bg-rose-950/20 transition';
+        badge.className = 'px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 border border-rose-500/40';
+        badge.textContent = 'BLOCK';
+        title.textContent = 'Query Execution Blocked by Policy Engine';
+        reason.textContent = policy.reason;
+        overall.className = 'text-xs font-semibold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40';
+        overall.textContent = 'EXECUTION BLOCKED';
+        bar.className = 'h-full bg-rose-500 transition-all duration-500';
+      }
+
+      // Query plan breakdown
+      const planList = document.getElementById('queryPlanList');
+      const planBox = document.getElementById('queryPlanBreakdown');
+      planList.innerHTML = '';
+      const factors = cost.complexity_factors || [];
+      const plan = cost.query_plan || [];
+
+      if (factors.length > 0 || plan.length > 0) {
+        planBox.classList.remove('hidden');
+        [...factors, ...plan].forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          planList.appendChild(li);
+        });
+      } else {
+        planBox.classList.add('hidden');
+      }
+    }
+
+    // Render Query Results Table & Charts
+    function renderResults(data) {
+      const resultsCard = document.getElementById('resultsCard');
+      const thead = document.getElementById('resultsTableHead');
+      const tbody = document.getElementById('resultsTableBody');
+      const countBadge = document.getElementById('resultsCountBadge');
+
+      resultsCard.classList.remove('hidden');
+
+      const rows = data.results || [];
+      const cols = data.columns || (rows.length > 0 ? Object.keys(rows[0]) : []);
+
+      countBadge.textContent = `${rows.length} rows returned`;
+
+      // Build Table Header
+      thead.innerHTML = `<tr>${cols.map(c => `<th class="p-2.5 font-semibold text-slate-300">${c}</th>`).join('')}</tr>`;
+
+      // Build Table Body
+      tbody.innerHTML = '';
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${cols.length}" class="p-4 text-center text-slate-500">Query executed successfully, 0 rows returned.</td></tr>`;
+      } else {
+        rows.slice(0, 50).forEach(r => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-800/40 transition';
+          tr.innerHTML = cols.map(c => `<td class="p-2.5">${r[c] !== null ? r[c] : '<span class="text-slate-600">NULL</span>'}</td>`).join('');
+          tbody.appendChild(tr);
+        });
+      }
+
+      // Prepare Chart.js Visualization
+      setupResultsChart(rows, cols);
+    }
+
+    function setupResultsChart(rows, cols) {
+      if (!rows || rows.length === 0 || cols.length < 2) return;
+
+      const labelCol = cols[0];
+      const numericCol = cols.find((c, i) => i > 0 && typeof rows[0][c] === 'number') || cols[1];
+
+      const labels = rows.slice(0, 15).map(r => String(r[labelCol]));
+      const datasetData = rows.slice(0, 15).map(r => Number(r[numericCol]) || 0);
+
+      const ctx = document.getElementById('resultsChartCanvas').getContext('2d');
+      if (state.chartInstance) {
+        state.chartInstance.destroy();
+      }
+
+      state.chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: numericCol.replace(/_/g, ' ').toUpperCase(),
+            data: datasetData,
+            backgroundColor: 'rgba(14, 165, 233, 0.4)',
+            borderColor: '#0ea5e9',
+            borderWidth: 1.5,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#94a3b8', font: { size: 11 } }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#94a3b8', font: { size: 10 } },
+              grid: { color: 'rgba(51, 65, 85, 0.3)' }
+            },
+            y: {
+              ticks: { color: '#94a3b8', font: { size: 10 } },
+              grid: { color: 'rgba(51, 65, 85, 0.3)' }
+            }
+          }
+        }
+      });
+    }
+
+    // Toggle Table vs Chart View
+    function setViewMode(mode) {
+      state.viewMode = mode;
+      const tblContainer = document.getElementById('tableViewContainer');
+      const chartContainer = document.getElementById('chartViewContainer');
+      const tblBtn = document.getElementById('viewBtn-table');
+      const chartBtn = document.getElementById('viewBtn-chart');
+
+      if (mode === 'table') {
+        tblContainer.classList.remove('hidden');
+        chartContainer.classList.add('hidden');
+        tblBtn.className = 'px-2.5 py-1 rounded font-medium text-sky-400 bg-sky-500/20 transition';
+        chartBtn.className = 'px-2.5 py-1 rounded font-medium text-slate-400 hover:text-slate-200 transition';
+      } else {
+        tblContainer.classList.add('hidden');
+        chartContainer.classList.remove('hidden');
+        chartBtn.className = 'px-2.5 py-1 rounded font-medium text-sky-400 bg-sky-500/20 transition';
+        tblBtn.className = 'px-2.5 py-1 rounded font-medium text-slate-400 hover:text-slate-200 transition';
+      }
+    }
+
+    // Export CSV
+    function exportResultsCSV() {
+      if (!state.lastQueryResult || !state.lastQueryResult.results) return;
+      const rows = state.lastQueryResult.results;
+      const cols = state.lastQueryResult.columns;
+
+      const header = cols.join(',');
+      const body = rows.map(r => cols.map(c => `"${String(r[c] || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const csv = `${header}\n${body}`;
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `governed_query_${Date.now()}.csv`);
+      a.click();
+    }
+
+    // Load Audit Logs
+    async function loadAuditLogs() {
+      try {
+        const res = await fetch('/api/logs?limit=20');
+        const logs = await res.json();
+        const tbody = document.getElementById('auditLogsBody');
+        tbody.innerHTML = '';
+
+        if (!logs || logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No query audit logs yet.</td></tr>';
+          return;
+        }
+
+        logs.forEach(l => {
+          const tr = document.createElement('tr');
+          const badgeClass = l.decision === 'ALLOW' 
+            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+            : (l.decision === 'WARN' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20');
+
+          tr.className = 'hover:bg-slate-800/40 transition';
+          tr.innerHTML = `
+            <td class="p-3 font-mono text-slate-500">#${l.id}</td>
+            <td class="p-3 text-slate-400">${l.timestamp}</td>
+            <td class="p-3 font-medium text-slate-200">${l.username}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-sky-400 font-mono text-[11px]">${l.role}</span></td>
+            <td class="p-3 text-slate-300 font-mono text-[11px] max-w-xs truncate" title="${l.metric}">${l.metric}</td>
+            <td class="p-3 font-mono text-slate-300">$${Number(l.estimated_cost).toFixed(4)}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${badgeClass}">${l.decision}</span></td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error('Failed to load logs:', e);
+      }
+    }
+
+    // Tab Navigation
+    function switchTab(tabId) {
+      ['studio', 'architecture', 'slides', 'audit'].forEach(t => {
+        const content = document.getElementById(`tabContent-${t}`);
+        const btn = document.getElementById(`tabBtn-${t}`);
+        if (t === tabId) {
+          content.classList.remove('hidden');
+          btn.className = 'tab-btn px-3 py-2 rounded-lg text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-2 transition';
+        } else {
+          content.classList.add('hidden');
+          btn.className = 'tab-btn px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 flex items-center gap-2 transition';
+        }
+      });
+    }
+  </script>
+</body>
+</html>
